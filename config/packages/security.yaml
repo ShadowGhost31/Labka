@@ -28,4 +28,7 @@ security:
   access_control:
     - { path: ^/api/login_check, roles: PUBLIC_ACCESS }
     - { path: ^/api/auth/register, roles: PUBLIC_ACCESS }
+    # Swagger / OpenAPI docs (Lab 6)
+    - { path: ^/api$, roles: PUBLIC_ACCESS }
+    - { path: ^/api/docs, roles: PUBLIC_ACCESS }
     - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
