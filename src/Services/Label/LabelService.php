@@ -1,4 +1,4 @@
-\<?php
+<?php
 
 namespace App\Services\Label;
 
@@ -10,28 +10,31 @@ final class LabelService
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly RequestCheckerService $requestChecker
+        private readonly RequestCheckerService $requestCheckerService
     ) {}
 
-    public function create(string $name, ?string $color = null) : Label
+    public function createLabel(string $name, ?string $color = null): Label
     {
-        $obj = new Label();
-        $obj->setName($name);
-        $obj->setColor($color);
+        $label = (new Label())
+            ->setName($name)
+            ->setColor($color);
 
-        $this->requestChecker->validateRequestDataByConstraints($obj);
-        $this->entityManager->persist($obj);
-        return $obj;
+        // Валідація constraint-ами Entity
+        $this->requestCheckerService->validateRequestDataByConstraints($label);
+
+        $this->entityManager->persist($label);
+        return $label;
     }
 
-    /**
-     * @param array<string, mixed> $data
-     */
-    public function update(Label $obj, array $data): void
+    public function updateLabel(Label $label, array $data): void
     {
-        if (array_key_exists('name', $data)) { $obj->setName((string)$data['name']); }
-        if (array_key_exists('color', $data)) { $obj->setColor($data['color'] !== null ? (string)$data['color'] : null); }
+        if (array_key_exists('name', $data)) {
+            $label->setName((string) $data['name']);
+        }
+        if (array_key_exists('color', $data)) {
+            $label->setColor($data['color'] !== null ? (string) $data['color'] : null);
+        }
 
-        $this->requestChecker->validateRequestDataByConstraints($obj);
+        $this->requestCheckerService->validateRequestDataByConstraints($label);
     }
 }
