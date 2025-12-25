@@ -5,10 +5,12 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'users')]
-class User
+class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -20,6 +22,10 @@ class User
 
     #[ORM\Column(length: 120)]
     private ?string $name = null;
+
+
+    #[ORM\Column(length: 255)]
+    private string $password = '';
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
@@ -314,4 +320,40 @@ class User
 
         return $this;
     }
+public function getUserIdentifier(): string
+{
+    return (string) $this->email;
+}
+
+public function getPassword(): string
+{
+    return $this->password;
+}
+
+public function setPassword(string $password): static
+{
+    $this->password = $password;
+
+    return $this;
+}
+
+public function getRoles(): array
+{
+    $roles = ['ROLE_USER'];
+
+    foreach ($this->userRoles as $userRole) {
+        $role = $userRole->getRole();
+        if ($role && $role->getName()) {
+            $roles[] = 'ROLE_' . strtoupper($role->getName());
+        }
+    }
+
+    return array_values(array_unique($roles));
+}
+
+public function eraseCredentials(): void
+{
+    // no-op
+}
+
 }
