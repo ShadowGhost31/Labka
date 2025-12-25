@@ -39,4 +39,26 @@ class Role
 
     /** @return Collection<int, UserRole> */
     public function getUserRoles(): Collection { return $this->userRoles; }
+
+    public function addUserRole(UserRole $userRole): static
+    {
+        if (!$this->userRoles->contains($userRole)) {
+            $this->userRoles->add($userRole);
+            $userRole->setRole($this);
+        }
+
+        return $this;
+    }
+
+    public function removeUserRole(UserRole $userRole): static
+    {
+        if ($this->userRoles->removeElement($userRole)) {
+            // set the owning side to null (unless already changed)
+            if ($userRole->getRole() === $this) {
+                $userRole->setRole(null);
+            }
+        }
+
+        return $this;
+    }
 }

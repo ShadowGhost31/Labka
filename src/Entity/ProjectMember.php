@@ -47,4 +47,11 @@ class ProjectMember
 
     public function getRole(): ?Role { return $this->role; }
     public function setRole(Role $role): static { $this->role = $role; return $this; }
+
+    public function setJoinedAt(\DateTimeImmutable $joinedAt): static
+    {
+        $this->joinedAt = $joinedAt;
+
+        return $this;
+    }
 }

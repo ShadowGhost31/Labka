@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -92,4 +93,131 @@ class Task
 
     public function getAssignee(): ?User { return $this->assignee; }
     public function setAssignee(?User $assignee): static { $this->assignee = $assignee; return $this; }
+
+    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    {
+        $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Comment>
+     */
+    public function getComments(): Collection
+    {
+        return $this->comments;
+    }
+
+    public function addComment(Comment $comment): static
+    {
+        if (!$this->comments->contains($comment)) {
+            $this->comments->add($comment);
+            $comment->setTask($this);
+        }
+
+        return $this;
+    }
+
+    public function removeComment(Comment $comment): static
+    {
+        if ($this->comments->removeElement($comment)) {
+            // set the owning side to null (unless already changed)
+            if ($comment->getTask() === $this) {
+                $comment->setTask(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Attachment>
+     */
+    public function getAttachments(): Collection
+    {
+        return $this->attachments;
+    }
+
+    public function addAttachment(Attachment $attachment): static
+    {
+        if (!$this->attachments->contains($attachment)) {
+            $this->attachments->add($attachment);
+            $attachment->setTask($this);
+        }
+
+        return $this;
+    }
+
+    public function removeAttachment(Attachment $attachment): static
+    {
+        if ($this->attachments->removeElement($attachment)) {
+            // set the owning side to null (unless already changed)
+            if ($attachment->getTask() === $this) {
+                $attachment->setTask(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, TimeEntry>
+     */
+    public function getTimeEntries(): Collection
+    {
+        return $this->timeEntries;
+    }
+
+    public function addTimeEntry(TimeEntry $timeEntry): static
+    {
+        if (!$this->timeEntries->contains($timeEntry)) {
+            $this->timeEntries->add($timeEntry);
+            $timeEntry->setTask($this);
+        }
+
+        return $this;
+    }
+
+    public function removeTimeEntry(TimeEntry $timeEntry): static
+    {
+        if ($this->timeEntries->removeElement($timeEntry)) {
+            // set the owning side to null (unless already changed)
+            if ($timeEntry->getTask() === $this) {
+                $timeEntry->setTask(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, TaskLabel>
+     */
+    public function getTaskLabels(): Collection
+    {
+        return $this->taskLabels;
+    }
+
+    public function addTaskLabel(TaskLabel $taskLabel): static
+    {
+        if (!$this->taskLabels->contains($taskLabel)) {
+            $this->taskLabels->add($taskLabel);
+            $taskLabel->setTask($this);
+        }
+
+        return $this;
+    }
+
+    public function removeTaskLabel(TaskLabel $taskLabel): static
+    {
+        if ($this->taskLabels->removeElement($taskLabel)) {
+            // set the owning side to null (unless already changed)
+            if ($taskLabel->getTask() === $this) {
+                $taskLabel->setTask(null);
+            }
+        }
+
+        return $this;
+    }
 }
