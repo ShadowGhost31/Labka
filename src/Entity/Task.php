@@ -2,17 +2,18 @@
 
 namespace App\Entity;
 
+use ApiPlatform\OpenApi\Model\Operation;
+use ApiPlatform\OpenApi\Model\Response;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Post;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use ApiPlatform\Metadata\ApiResource;
-use ApiPlatform\Metadata\Get;
-use ApiPlatform\Metadata\GetCollection;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Patch;
-use ApiPlatform\Metadata\Delete;
-use ApiPlatform\Metadata\ApiProperty;
 use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
@@ -20,82 +21,97 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ApiResource(
     operations: [
         new GetCollection(normalizationContext: ['groups' => ['task:read']]),
-        new Post(denormalizationContext: ['groups' => ['task:write']], normalizationContext: ['groups' => ['task:read']]),
+        new Post(
+            denormalizationContext: ['groups' => ['task:write']],
+            normalizationContext: ['groups' => ['task:read']]
+        ),
         new Get(normalizationContext: ['groups' => ['task:read']]),
-        new Patch(denormalizationContext: ['groups' => ['task:write']], normalizationContext: ['groups' => ['task:read']]),
+        new Patch(
+            denormalizationContext: ['groups' => ['task:write']],
+            normalizationContext: ['groups' => ['task:read']]
+        ),
         new Delete(),
+
+        // Lab 8 Action #2
+        new Post(
+            uriTemplate: '/tasks/{id}/assign-me',
+            requirements: ['id' => '\d+'],
+            controller: \App\Controller\Api\AssignMeToTaskAction::class,
+            read: true,          // підвантажить Task по id
+            deserialize: false,  // не читаємо body
+            output: false,       // JsonResponse повертає контролер
+            name: 'task_assign_me',
+            openapi: new Operation(
+                summary: 'Призначити поточного користувача виконавцем',
+                description: 'Кастомний Action для Lab 8. Встановлює assignee = current user.',
+                responses: [
+                    '200' => new Response(description: 'OK'),
+                    '401' => new Response(description: 'Unauthorized'),
+                    '404' => new Response(description: 'Task not found'),
+                ]
+            )
+        ),
     ]
 )]
+
 class Task
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(["task:read"])]
+    #[Groups(['task:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 200)]
-    #[Groups(["task:read", "task:write"])]
+    #[Groups(['task:read','task:write'])]
     private ?string $title = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
-    #[Groups(["task:read", "task:write"])]
+    #[Groups(['task:read','task:write'])]
     private ?string $description = null;
 
     #[ORM\Column]
-    #[Groups(["task:read", "task:write"])]
+    #[Groups(['task:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column(nullable: true)]
-    #[Groups(["task:read", "task:write"])]
+    #[Groups(['task:read','task:write'])]
     private ?\DateTimeImmutable $dueAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'tasks')]
     #[ORM\JoinColumn(nullable: false)]
-    #[ApiProperty(readableLink: false, writableLink: false)]
-    #[Groups(["task:read", "task:write"])]
+    #[Groups(['task:read','task:write'])]
     private ?Project $project = null;
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
-    #[ApiProperty(readableLink: false, writableLink: false)]
-    #[Groups(["task:read", "task:write"])]
+    #[Groups(['task:read','task:write'])]
     private ?TaskStatus $status = null;
 
     #[ORM\ManyToOne(inversedBy: 'createdTasks')]
     #[ORM\JoinColumn(nullable: false)]
-    #[ApiProperty(readableLink: false, writableLink: false)]
-    #[Groups(["task:read", "task:write"])]
+    #[Groups(['task:read','task:write'])]
     private ?User $creator = null;
 
     #[ORM\ManyToOne(inversedBy: 'assignedTasks')]
     #[ORM\JoinColumn(nullable: true)]
-    #[ApiProperty(readableLink: false, writableLink: false)]
-    #[Groups(["task:read", "task:write"])]
+    #[Groups(['task:read','task:write'])]
     private ?User $assignee = null;
 
     /** @var Collection<int, Comment> */
     #[ORM\OneToMany(mappedBy: 'task', targetEntity: Comment::class, orphanRemoval: true)]
-    #[ApiProperty(readableLink: false, writableLink: false)]
-    #[Groups(["task:read", "task:write"])]
     private Collection $comments;
 
     /** @var Collection<int, Attachment> */
     #[ORM\OneToMany(mappedBy: 'task', targetEntity: Attachment::class, orphanRemoval: true)]
-    #[ApiProperty(readableLink: false, writableLink: false)]
-    #[Groups(["task:read", "task:write"])]
     private Collection $attachments;
 
     /** @var Collection<int, TimeEntry> */
     #[ORM\OneToMany(mappedBy: 'task', targetEntity: TimeEntry::class, orphanRemoval: true)]
-    #[ApiProperty(readableLink: false, writableLink: false)]
-    #[Groups(["task:read", "task:write"])]
     private Collection $timeEntries;
 
     /** @var Collection<int, TaskLabel> */
     #[ORM\OneToMany(mappedBy: 'task', targetEntity: TaskLabel::class, orphanRemoval: true)]
-    #[ApiProperty(readableLink: false, writableLink: false)]
-    #[Groups(["task:read", "task:write"])]
     private Collection $taskLabels;
 
     public function __construct()

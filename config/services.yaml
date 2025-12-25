@@ -13,3 +13,14 @@ services:
     App\EventListener\RuntimeConstraintExceptionListener:
         tags:
             - { name: kernel.event_listener, event: kernel.exception }
+
+    # Lab 8: API Platform Doctrine ORM Extensions (for collections + items)
+    App\Extension\ProjectOwnerExtension:
+        tags:
+            - { name: 'api_platform.doctrine.orm.query_extension.collection' }
+            - { name: 'api_platform.doctrine.orm.query_extension.item' }
+
+    App\Extension\TaskCreatorExtension:
+        tags:
+            - { name: 'api_platform.doctrine.orm.query_extension.collection' }
+            - { name: 'api_platform.doctrine.orm.query_extension.item' }

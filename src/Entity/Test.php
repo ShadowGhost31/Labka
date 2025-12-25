@@ -11,7 +11,6 @@ use ApiPlatform\Metadata\Post;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Uid\Uuid;
-use ApiPlatform\Metadata\ApiProperty;
 
 #[ApiResource(
     operations: [
@@ -34,15 +33,6 @@ use ApiPlatform\Metadata\ApiProperty;
 )]
 #[ORM\Entity]
 #[ORM\Table(name: 'tests')]
-#[ApiResource(
-    operations: [
-        new GetCollection(normalizationContext: ['groups' => ['test:read']]),
-        new Post(denormalizationContext: ['groups' => ['test:write']], normalizationContext: ['groups' => ['test:read']]),
-        new Get(normalizationContext: ['groups' => ['test:read']]),
-        new Patch(denormalizationContext: ['groups' => ['test:write']], normalizationContext: ['groups' => ['test:read']]),
-        new Delete(),
-    ]
-)]
 class Test
 {
     #[ORM\Id]
@@ -57,7 +47,6 @@ class Test
         'post:collection:test',
         'patch:item:test',
     ])]
-    #[Groups(["test:read", "test:write"])]
     private string $name;
 
     // Using string here to avoid float precision issues.
@@ -68,7 +57,6 @@ class Test
         'post:collection:test',
         'patch:item:test',
     ])]
-    #[Groups(["test:read", "test:write"])]
     private string $price;
 
     public function __construct(string $name = '', string $price = '0.00')
