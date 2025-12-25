@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\Label;
 use App\Repository\LabelRepository;
 use App\Service\RequestValidator;
+use App\Service\EntityFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,7 +31,7 @@ final class LabelController extends BaseApiController
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, RequestValidator $v): Response
+    public function create(Request $request, EntityManagerInterface $em, RequestValidator $v, EntityFactory $factory): Response
     {
         $data = $this->getJson($request);
         try {
@@ -39,10 +40,11 @@ final class LabelController extends BaseApiController
             return $this->jsonError($e->getMessage(), 400);
         }
 
-        $entity = new Label();
-        $entity->setName((string)($data['name'] ?? ''));
-                $entity->setColor(isset($data['color']) ? (string)$data['color'] : null);
-        $em->persist($entity);
+        $name = $v->requireString($data['name'] ?? null, 'name', 1, 50);
+        $color = $v->optionalHexColor($data['color'] ?? null, 'color');
+
+        $entity = $factory->createLabel($name, $color);
+$em->persist($entity);
         $this->flush($em);
 
         return $this->jsonOk($entity, 201);

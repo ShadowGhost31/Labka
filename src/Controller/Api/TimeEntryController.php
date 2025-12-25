@@ -7,6 +7,7 @@ use App\Repository\TaskRepository;
 use App\Repository\TimeEntryRepository;
 use App\Repository\UserRepository;
 use App\Service\RequestValidator;
+use App\Service\EntityFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,12 +30,12 @@ final class TimeEntryController extends BaseApiController
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, UserRepository $users, RequestValidator $v): Response
+    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, UserRepository $users, RequestValidator $v, EntityFactory $factory): Response
     {
         $data = $this->getJson($request);
 
         try {
-            $v->requireFields($data, ['minutes','workDate','taskId','userId']);
+            $v->requireFields($data, ['minutes', 'workDate', 'taskId', 'userId']);
             $taskId = $v->requireInt($data['taskId'] ?? null, 'taskId');
             $userId = $v->requireInt($data['userId'] ?? null, 'userId');
         } catch (\Throwable $e) {
@@ -46,23 +47,26 @@ final class TimeEntryController extends BaseApiController
         if (!$task) return $this->jsonError('Task not found', 404);
         if (!$user) return $this->jsonError('User not found', 404);
 
-        $entity = new TimeEntry();
-        $entity->setMinutes((int)$data['minutes']);
-        $entity->setTask($task);
-        $entity->setUser($user);
-        $entity->setNote(isset($data['note']) ? (string)$data['note'] : null);
+        $minutes = $v->requireNonNegativeInt($data['minutes'] ?? null, 'minutes');
 
-        if (isset($data['workDate']) && is_string($data['workDate'])) {
-            try { $entity->setWorkDate(new \DateTimeImmutable($data['workDate'])); } catch (\Throwable) {}
+        // workDate required
+        try {
+            $workDate = new \DateTimeImmutable((string)$data['workDate']);
+        } catch (\Throwable $e) {
+            return $this->jsonError("Field 'workDate' must be a valid date (YYYY-MM-DD)", 400);
         }
 
+        $note = isset($data['note']) ? (string)$data['note'] : null;
+
+        $entity = $factory->createTimeEntry($minutes, $workDate, $task, $user, $note);
+
         $em->persist($entity);
-        $this->flush($em);
+        $em->flush();
 
         return $this->jsonOk($entity, 201);
     }
 
-    #[Route('/{id}', methods: ['PUT','PATCH'])]
+        #[Route('/{id}', methods: ['PUT','PATCH'])]
     public function update(int $id, Request $request, TimeEntryRepository $repo, TaskRepository $tasks, UserRepository $users, EntityManagerInterface $em): Response
     {
         $entity = $repo->find($id);

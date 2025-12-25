@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\Role;
 use App\Repository\RoleRepository;
 use App\Service\RequestValidator;
+use App\Service\EntityFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -30,7 +31,7 @@ final class RoleController extends BaseApiController
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, RequestValidator $v): Response
+    public function create(Request $request, EntityManagerInterface $em, RequestValidator $v, EntityFactory $factory): Response
     {
         $data = $this->getJson($request);
         try {
@@ -39,9 +40,10 @@ final class RoleController extends BaseApiController
             return $this->jsonError($e->getMessage(), 400);
         }
 
-        $entity = new Role();
-        $entity->setName((string)($data['name'] ?? ''));
-        $em->persist($entity);
+        $name = $v->requireString($data['name'] ?? null, 'name', 1, 50);
+
+        $entity = $factory->createRole($name);
+$em->persist($entity);
         $this->flush($em);
 
         return $this->jsonOk($entity, 201);

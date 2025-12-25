@@ -2,12 +2,12 @@
 
 namespace App\Controller\Api;
 
-use App\Entity\Task;
+use App\Service\EntityFactory;
+use App\Service\RequestValidator;
 use App\Repository\ProjectRepository;
 use App\Repository\TaskRepository;
 use App\Repository\TaskStatusRepository;
 use App\Repository\UserRepository;
-use App\Service\RequestValidator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -36,7 +36,8 @@ final class TaskController extends BaseApiController
         ProjectRepository $projects,
         TaskStatusRepository $statuses,
         UserRepository $users,
-        RequestValidator $v
+        RequestValidator $v,
+        EntityFactory $factory
     ): Response {
         $data = $this->getJson($request);
 
@@ -45,34 +46,30 @@ final class TaskController extends BaseApiController
             $projectId = $v->requireInt($data['projectId'] ?? null, 'projectId');
             $statusId  = $v->requireInt($data['statusId'] ?? null, 'statusId');
             $creatorId = $v->requireInt($data['creatorId'] ?? null, 'creatorId');
+
+            $title = $v->requireString($data['title'] ?? null, 'title', 1, 200);
         } catch (\Throwable $e) {
             return $this->jsonError($e->getMessage(), 400);
         }
 
         $project = $projects->find($projectId);
-        $status = $statuses->find($statusId);
+        $status  = $statuses->find($statusId);
         $creator = $users->find($creatorId);
 
         if (!$project) return $this->jsonError('Project not found', 404);
-        if (!$status) return $this->jsonError('Status not found', 404);
+        if (!$status)  return $this->jsonError('Status not found', 404);
         if (!$creator) return $this->jsonError('Creator not found', 404);
 
-        $entity = new Task();
-        $entity->setTitle((string)$data['title']);
-        $entity->setDescription(isset($data['description']) ? (string)$data['description'] : null);
-        $entity->setProject($project);
-        $entity->setStatus($status);
-        $entity->setCreator($creator);
+        $desc = $v->optionalString($data['description'] ?? null, 5000);
+        $dueAt = $v->optionalDateTimeImmutable($data['dueAt'] ?? null, 'dueAt');
 
-        if (isset($data['assigneeId']) && $data['assigneeId'] !== null && $data['assigneeId'] !== '') {
-            $assignee = $users->find((int)$data['assigneeId']);
+        $assignee = null;
+        if (array_key_exists('assigneeId', $data) && $data['assigneeId'] !== null && $data['assigneeId'] !== '') {
+            $assignee = $users->find((int) $data['assigneeId']);
             if (!$assignee) return $this->jsonError('Assignee not found', 404);
-            $entity->setAssignee($assignee);
         }
 
-        if (isset($data['dueAt']) && is_string($data['dueAt']) && $data['dueAt'] !== '') {
-            try { $entity->setDueAt(new \DateTimeImmutable($data['dueAt'])); } catch (\Throwable) {}
-        }
+        $entity = $factory->createTask($title, $desc, $project, $status, $creator, $assignee, $dueAt);
 
         $em->persist($entity);
         $this->flush($em);
@@ -88,31 +85,44 @@ final class TaskController extends BaseApiController
         ProjectRepository $projects,
         TaskStatusRepository $statuses,
         UserRepository $users,
-        EntityManagerInterface $em
+        EntityManagerInterface $em,
+        RequestValidator $v
     ): Response {
         $entity = $repo->find($id);
         if (!$entity) return $this->jsonError('Not found', 404);
 
         $data = $this->getJson($request);
 
-        if (isset($data['title'])) $entity->setTitle((string)$data['title']);
-        if (array_key_exists('description', $data)) $entity->setDescription($data['description'] !== null ? (string)$data['description'] : null);
+        if (isset($data['title'])) {
+            try {
+                $entity->setTitle($v->requireString($data['title'], 'title', 1, 200));
+            } catch (\Throwable $e) {
+                return $this->jsonError($e->getMessage(), 400);
+            }
+        }
+
+        if (array_key_exists('description', $data)) {
+            $entity->setDescription($data['description'] !== null ? (string) $data['description'] : null);
+        }
 
         if (isset($data['projectId'])) {
             $project = $projects->find((int)$data['projectId']);
             if (!$project) return $this->jsonError('Project not found', 404);
             $entity->setProject($project);
         }
+
         if (isset($data['statusId'])) {
             $status = $statuses->find((int)$data['statusId']);
             if (!$status) return $this->jsonError('Status not found', 404);
             $entity->setStatus($status);
         }
+
         if (isset($data['creatorId'])) {
             $creator = $users->find((int)$data['creatorId']);
             if (!$creator) return $this->jsonError('Creator not found', 404);
             $entity->setCreator($creator);
         }
+
         if (array_key_exists('assigneeId', $data)) {
             if ($data['assigneeId'] === null || $data['assigneeId'] === '') {
                 $entity->setAssignee(null);
@@ -126,8 +136,12 @@ final class TaskController extends BaseApiController
         if (array_key_exists('dueAt', $data)) {
             if ($data['dueAt'] === null || $data['dueAt'] === '') {
                 $entity->setDueAt(null);
-            } elseif (is_string($data['dueAt'])) {
-                try { $entity->setDueAt(new \DateTimeImmutable($data['dueAt'])); } catch (\Throwable) {}
+            } else {
+                try {
+                    $entity->setDueAt($v->optionalDateTimeImmutable($data['dueAt'], 'dueAt'));
+                } catch (\Throwable $e) {
+                    return $this->jsonError($e->getMessage(), 400);
+                }
             }
         }
 

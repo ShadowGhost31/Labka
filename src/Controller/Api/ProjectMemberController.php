@@ -8,6 +8,7 @@ use App\Repository\ProjectRepository;
 use App\Repository\RoleRepository;
 use App\Repository\UserRepository;
 use App\Service\RequestValidator;
+use App\Service\EntityFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -36,7 +37,8 @@ final class ProjectMemberController extends BaseApiController
         ProjectRepository $projects,
         UserRepository $users,
         RoleRepository $roles,
-        RequestValidator $v
+        RequestValidator $v,
+        EntityFactory $factory
     ): Response {
         $data = $this->getJson($request);
 
@@ -57,12 +59,8 @@ final class ProjectMemberController extends BaseApiController
         if (!$user) return $this->jsonError('User not found', 404);
         if (!$role) return $this->jsonError('Role not found', 404);
 
-        $entity = new ProjectMember();
-        $entity->setProject($project);
-        $entity->setUser($user);
-        $entity->setRole($role);
-
-        $em->persist($entity);
+        $entity = $factory->createProjectMember($project, $user, $role);
+$em->persist($entity);
         $this->flush($em);
 
         return $this->jsonOk($entity, 201);

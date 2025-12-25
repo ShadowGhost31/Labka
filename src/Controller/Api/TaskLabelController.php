@@ -7,6 +7,7 @@ use App\Repository\LabelRepository;
 use App\Repository\TaskLabelRepository;
 use App\Repository\TaskRepository;
 use App\Service\RequestValidator;
+use App\Service\EntityFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,7 +30,7 @@ final class TaskLabelController extends BaseApiController
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, LabelRepository $labels, RequestValidator $v): Response
+    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, LabelRepository $labels, RequestValidator $v, EntityFactory $factory): Response
     {
         $data = $this->getJson($request);
 
@@ -46,11 +47,8 @@ final class TaskLabelController extends BaseApiController
         if (!$task) return $this->jsonError('Task not found', 404);
         if (!$label) return $this->jsonError('Label not found', 404);
 
-        $entity = new TaskLabel();
-        $entity->setTask($task);
-        $entity->setLabel($label);
-
-        $em->persist($entity);
+        $entity = $factory->createTaskLabel($task, $label);
+$em->persist($entity);
         $this->flush($em);
 
         return $this->jsonOk($entity, 201);

@@ -7,6 +7,7 @@ use App\Repository\RoleRepository;
 use App\Repository\UserRepository;
 use App\Repository\UserRoleRepository;
 use App\Service\RequestValidator;
+use App\Service\EntityFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,7 +30,7 @@ final class UserRoleController extends BaseApiController
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, UserRepository $users, RoleRepository $roles, RequestValidator $v): Response
+    public function create(Request $request, EntityManagerInterface $em, UserRepository $users, RoleRepository $roles, RequestValidator $v, EntityFactory $factory): Response
     {
         $data = $this->getJson($request);
 
@@ -47,11 +48,8 @@ final class UserRoleController extends BaseApiController
         if (!$user) return $this->jsonError('User not found', 404);
         if (!$role) return $this->jsonError('Role not found', 404);
 
-        $entity = new UserRole();
-        $entity->setUser($user);
-        $entity->setRole($role);
-
-        $em->persist($entity);
+        $entity = $factory->createUserRole($user, $role);
+$em->persist($entity);
         $this->flush($em);
 
         return $this->jsonOk($entity, 201);

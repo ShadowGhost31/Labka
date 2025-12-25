@@ -6,6 +6,7 @@ use App\Entity\Project;
 use App\Repository\ProjectRepository;
 use App\Repository\UserRepository;
 use App\Service\RequestValidator;
+use App\Service\EntityFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,7 +29,7 @@ final class ProjectController extends BaseApiController
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, UserRepository $users, RequestValidator $v): Response
+    public function create(Request $request, EntityManagerInterface $em, UserRepository $users, RequestValidator $v, EntityFactory $factory): Response
     {
         $data = $this->getJson($request);
         try {
@@ -43,12 +44,11 @@ final class ProjectController extends BaseApiController
             return $this->jsonError('Owner not found', 404);
         }
 
-        $entity = new Project();
-        $entity->setTitle((string)$data['title']);
-        $entity->setDescription(isset($data['description']) ? (string)$data['description'] : null);
-        $entity->setOwner($owner);
+        $title = $v->requireString($data['title'] ?? null, 'title', 1, 160);
+        $desc = $v->optionalString($data['description'] ?? null, 2000);
 
-        $em->persist($entity);
+        $entity = $factory->createProject($title, $desc, $owner);
+$em->persist($entity);
         $this->flush($em);
 
         return $this->jsonOk($entity, 201);

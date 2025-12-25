@@ -7,6 +7,7 @@ use App\Repository\AttachmentRepository;
 use App\Repository\TaskRepository;
 use App\Repository\UserRepository;
 use App\Service\RequestValidator;
+use App\Service\EntityFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,7 +30,7 @@ final class AttachmentController extends BaseApiController
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, UserRepository $users, RequestValidator $v): Response
+    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, UserRepository $users, RequestValidator $v, EntityFactory $factory): Response
     {
         $data = $this->getJson($request);
 
@@ -46,13 +47,11 @@ final class AttachmentController extends BaseApiController
         if (!$task) return $this->jsonError('Task not found', 404);
         if (!$user) return $this->jsonError('User not found', 404);
 
-        $entity = new Attachment();
-        $entity->setFilename((string)$data['filename']);
-        $entity->setPath((string)$data['path']);
-        $entity->setTask($task);
-        $entity->setUploadedBy($user);
+        $filename = $v->requireString($data['filename'] ?? null, 'filename', 1, 255);
+        $path = $v->requireString($data['path'] ?? null, 'path', 1, 512);
 
-        $em->persist($entity);
+        $entity = $factory->createAttachment($filename, $path, $task, $user);
+$em->persist($entity);
         $this->flush($em);
 
         return $this->jsonOk($entity, 201);

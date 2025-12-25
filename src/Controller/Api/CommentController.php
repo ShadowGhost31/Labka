@@ -7,6 +7,7 @@ use App\Repository\CommentRepository;
 use App\Repository\TaskRepository;
 use App\Repository\UserRepository;
 use App\Service\RequestValidator;
+use App\Service\EntityFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,7 +30,7 @@ final class CommentController extends BaseApiController
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, UserRepository $users, RequestValidator $v): Response
+    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, UserRepository $users, RequestValidator $v, EntityFactory $factory): Response
     {
         $data = $this->getJson($request);
 
@@ -46,12 +47,10 @@ final class CommentController extends BaseApiController
         if (!$task) return $this->jsonError('Task not found', 404);
         if (!$author) return $this->jsonError('Author not found', 404);
 
-        $entity = new Comment();
-        $entity->setContent((string)$data['content']);
-        $entity->setTask($task);
-        $entity->setAuthor($author);
+        $content = $v->requireString($data['content'] ?? null, 'content', 1, 20000);
 
-        $em->persist($entity);
+        $entity = $factory->createComment($content, $task, $author);
+$em->persist($entity);
         $this->flush($em);
 
         return $this->jsonOk($entity, 201);
