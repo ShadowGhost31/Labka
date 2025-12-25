@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'user_roles', uniqueConstraints: [
@@ -17,7 +18,9 @@ class UserRole
 
     #[ORM\ManyToOne(inversedBy: 'userRoles')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?User $user = null;
+    
+    #[Assert\NotNull]
+private ?User $user = null;
 
     #[ORM\ManyToOne(inversedBy: 'userRoles')]
     #[ORM\JoinColumn(nullable: false)]

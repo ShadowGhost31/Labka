@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'project_members', uniqueConstraints: [
@@ -20,7 +21,9 @@ class ProjectMember
 
     #[ORM\ManyToOne(inversedBy: 'members')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?Project $project = null;
+    
+    #[Assert\NotNull]
+private ?Project $project = null;
 
     #[ORM\ManyToOne(inversedBy: 'projectMemberships')]
     #[ORM\JoinColumn(nullable: false)]

@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'task_statuses')]
@@ -14,10 +15,18 @@ class TaskStatus
     private ?int $id = null;
 
     #[ORM\Column(length: 50, unique: true)]
-    private ?string $name = null;
+    
+    #[Assert\NotBlank]
+
+    #[Assert\Length(max: 50)]
+private ?string $name = null;
 
     #[ORM\Column]
-    private int $sortOrder = 0;
+    
+    #[Assert\NotNull]
+
+    #[Assert\PositiveOrZero]
+private int $sortOrder = 0;
 
     public function getId(): ?int { return $this->id; }
 

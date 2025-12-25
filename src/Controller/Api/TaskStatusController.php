@@ -2,18 +2,27 @@
 
 namespace App\Controller\Api;
 
-use App\Entity\TaskStatus;
 use App\Repository\TaskStatusRepository;
-use App\Service\RequestValidator;
-use App\Service\EntityFactory;
+use App\Services\TaskStatus\TaskStatusService;
+use App\Services\RequestCheckerService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[Route('/api/task-statuses')]
 final class TaskStatusController extends BaseApiController
 {
+    private const REQUIRED_FIELDS_FOR_CREATE = ["name", "sortOrder"];
+
+    public function __construct(
+        private readonly EntityManagerInterface $entityManager,
+        private readonly RequestCheckerService $requestChecker,
+        private readonly TaskStatusService $service
+    ) {}
+
     #[Route('', methods: ['GET'])]
     public function index(TaskStatusRepository $repo): Response
     {
@@ -23,57 +32,44 @@ final class TaskStatusController extends BaseApiController
     #[Route('/{id}', methods: ['GET'])]
     public function show(int $id, TaskStatusRepository $repo): Response
     {
-        $entity = $repo->find($id);
-        if (!$entity) {
-            return $this->jsonError('Not found', 404);
-        }
-        return $this->jsonOk($entity);
+        $obj = $repo->find($id);
+        if (!$obj) throw new NotFoundHttpException('Not found');
+        return $this->jsonOk($obj);
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, RequestValidator $v, EntityFactory $factory): Response
+    public function create(Request $request): JsonResponse
     {
-        $data = $this->getJson($request);
-        try {
-            $v->requireFields($data, ["name"]);
-        } catch (\Throwable $e) {
-            return $this->jsonError($e->getMessage(), 400);
-        }
+        $data = json_decode($request->getContent(), true);
+        $this->requestChecker->check($data, self::REQUIRED_FIELDS_FOR_CREATE);
 
-        $name = $v->requireString($data['name'] ?? null, 'name', 1, 50);
-        $sort = isset($data['sortOrder']) ? (int)$data['sortOrder'] : 0;
+        $obj = $this->service->create((string)$data['name'], (int)$data['sortOrder']);
 
-        $entity = $factory->createTaskStatus($name, $sort);
-$em->persist($entity);
-        $this->flush($em);
-
-        return $this->jsonOk($entity, 201);
+        $this->entityManager->flush();
+        return new JsonResponse($obj, Response::HTTP_CREATED);
     }
 
     #[Route('/{id}', methods: ['PUT','PATCH'])]
-    public function update(int $id, Request $request, TaskStatusRepository $repo, EntityManagerInterface $em): Response
+    public function update(int $id, Request $request, TaskStatusRepository $repo): JsonResponse
     {
-        $entity = $repo->find($id);
-        if (!$entity) {
-            return $this->jsonError('Not found', 404);
-        }
+        $obj = $repo->find($id);
+        if (!$obj) throw new NotFoundHttpException('Not found');
 
-        $data = $this->getJson($request);
-        if (isset($data['name'])) { $entity->setName((string)$data['name']); }
-                if (isset($data['sortOrder'])) { $entity->setSortOrder((int)$data['sortOrder']); }
-        $this->flush($em);
-        return $this->jsonOk($entity);
+        $data = json_decode($request->getContent(), true) ?? [];
+        $this->service->update($obj, $data);
+
+        $this->entityManager->flush();
+        return new JsonResponse($obj, Response::HTTP_OK);
     }
 
     #[Route('/{id}', methods: ['DELETE'])]
-    public function delete(int $id, TaskStatusRepository $repo, EntityManagerInterface $em): Response
+    public function delete(int $id, TaskStatusRepository $repo): JsonResponse
     {
-        $entity = $repo->find($id);
-        if (!$entity) {
-            return $this->jsonError('Not found', 404);
-        }
-        $em->remove($entity);
-        $this->flush($em);
-        return $this->jsonOk(['status' => 'deleted']);
+        $obj = $repo->find($id);
+        if (!$obj) throw new NotFoundHttpException('Not found');
+
+        $this->entityManager->remove($obj);
+        $this->entityManager->flush();
+        return new JsonResponse(['status' => 'deleted'], Response::HTTP_OK);
     }
 }

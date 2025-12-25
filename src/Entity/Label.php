@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'labels')]
@@ -14,10 +15,16 @@ class Label
     private ?int $id = null;
 
     #[ORM\Column(length: 50, unique: true)]
-    private ?string $name = null;
+    
+    #[Assert\NotBlank]
+
+    #[Assert\Length(max: 50)]
+private ?string $name = null;
 
     #[ORM\Column(length: 16, nullable: true)]
-    private ?string $color = null;
+    
+    #[Assert\Regex(pattern: '/^#?[0-9A-Fa-f]{6}$/', message: 'Color must be hex like #AABBCC')]
+private ?string $color = null;
 
     public function getId(): ?int { return $this->id; }
 

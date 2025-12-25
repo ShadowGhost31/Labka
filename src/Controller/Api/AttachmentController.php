@@ -2,20 +2,31 @@
 
 namespace App\Controller\Api;
 
-use App\Entity\Attachment;
 use App\Repository\AttachmentRepository;
 use App\Repository\TaskRepository;
 use App\Repository\UserRepository;
-use App\Service\RequestValidator;
-use App\Service\EntityFactory;
+use App\Services\Attachment\AttachmentService;
+use App\Services\RequestCheckerService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[Route('/api/attachments')]
 final class AttachmentController extends BaseApiController
 {
+    private const REQUIRED_FIELDS_FOR_CREATE = ['filename','path','taskId','uploadedById'];
+
+    public function __construct(
+        private readonly EntityManagerInterface $entityManager,
+        private readonly RequestCheckerService $requestChecker,
+        private readonly AttachmentService $service,
+        private readonly TaskRepository $tasks,
+        private readonly UserRepository $users
+    ) {}
+
     #[Route('', methods: ['GET'])]
     public function index(AttachmentRepository $repo): Response
     {
@@ -25,72 +36,56 @@ final class AttachmentController extends BaseApiController
     #[Route('/{id}', methods: ['GET'])]
     public function show(int $id, AttachmentRepository $repo): Response
     {
-        $entity = $repo->find($id);
-        return $entity ? $this->jsonOk($entity) : $this->jsonError('Not found', 404);
+        $a = $repo->find($id);
+        if (!$a) throw new NotFoundHttpException('Not found');
+        return $this->jsonOk($a);
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, UserRepository $users, RequestValidator $v, EntityFactory $factory): Response
+    public function create(Request $request): JsonResponse
     {
-        $data = $this->getJson($request);
+        $data = json_decode($request->getContent(), true);
+        $this->requestChecker->check($data, self::REQUIRED_FIELDS_FOR_CREATE);
 
-        try {
-            $v->requireFields($data, ['filename','path','taskId','uploadedById']);
-            $taskId = $v->requireInt($data['taskId'] ?? null, 'taskId');
-            $uploadedById = $v->requireInt($data['uploadedById'] ?? null, 'uploadedById');
-        } catch (\Throwable $e) {
-            return $this->jsonError($e->getMessage(), 400);
-        }
+        $task = $this->tasks->find((int)$data['taskId']);
+        $user = $this->users->find((int)$data['uploadedById']);
+        if (!$task) throw new NotFoundHttpException('Task not found');
+        if (!$user) throw new NotFoundHttpException('User not found');
 
-        $task = $tasks->find($taskId);
-        $user = $users->find($uploadedById);
-        if (!$task) return $this->jsonError('Task not found', 404);
-        if (!$user) return $this->jsonError('User not found', 404);
+        $a = $this->service->create((string)$data['filename'], (string)$data['path'], $task, $user);
 
-        $filename = $v->requireString($data['filename'] ?? null, 'filename', 1, 255);
-        $path = $v->requireString($data['path'] ?? null, 'path', 1, 512);
-
-        $entity = $factory->createAttachment($filename, $path, $task, $user);
-$em->persist($entity);
-        $this->flush($em);
-
-        return $this->jsonOk($entity, 201);
+        $this->entityManager->flush();
+        return new JsonResponse($a, Response::HTTP_CREATED);
     }
 
     #[Route('/{id}', methods: ['PUT','PATCH'])]
-    public function update(int $id, Request $request, AttachmentRepository $repo, TaskRepository $tasks, UserRepository $users, EntityManagerInterface $em): Response
+    public function update(int $id, Request $request, AttachmentRepository $repo): JsonResponse
     {
-        $entity = $repo->find($id);
-        if (!$entity) return $this->jsonError('Not found', 404);
+        $a = $repo->find($id);
+        if (!$a) throw new NotFoundHttpException('Not found');
 
-        $data = $this->getJson($request);
+        $data = json_decode($request->getContent(), true) ?? [];
 
-        if (isset($data['filename'])) $entity->setFilename((string)$data['filename']);
-        if (isset($data['path'])) $entity->setPath((string)$data['path']);
+        $task = isset($data['taskId']) ? $this->tasks->find((int)$data['taskId']) : null;
+        $user = isset($data['uploadedById']) ? $this->users->find((int)$data['uploadedById']) : null;
 
-        if (isset($data['taskId'])) {
-            $task = $tasks->find((int)$data['taskId']);
-            if (!$task) return $this->jsonError('Task not found', 404);
-            $entity->setTask($task);
-        }
-        if (isset($data['uploadedById'])) {
-            $user = $users->find((int)$data['uploadedById']);
-            if (!$user) return $this->jsonError('User not found', 404);
-            $entity->setUploadedBy($user);
-        }
+        if (isset($data['taskId']) && !$task) throw new NotFoundHttpException('Task not found');
+        if (isset($data['uploadedById']) && !$user) throw new NotFoundHttpException('User not found');
 
-        $this->flush($em);
-        return $this->jsonOk($entity);
+        $this->service->update($a, $data, $task, $user);
+
+        $this->entityManager->flush();
+        return new JsonResponse($a, Response::HTTP_OK);
     }
 
     #[Route('/{id}', methods: ['DELETE'])]
-    public function delete(int $id, AttachmentRepository $repo, EntityManagerInterface $em): Response
+    public function delete(int $id, AttachmentRepository $repo): JsonResponse
     {
-        $entity = $repo->find($id);
-        if (!$entity) return $this->jsonError('Not found', 404);
+        $a = $repo->find($id);
+        if (!$a) throw new NotFoundHttpException('Not found');
 
-        $em->remove($entity);
-        $this->flush($em);
-        return $this->jsonOk(['status' => 'deleted']);
+        $this->entityManager->remove($a);
+        $this->entityManager->flush();
+        return new JsonResponse(['status' => 'deleted'], Response::HTTP_OK);
     }
 }

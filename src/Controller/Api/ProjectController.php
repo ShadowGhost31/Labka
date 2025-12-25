@@ -2,19 +2,29 @@
 
 namespace App\Controller\Api;
 
-use App\Entity\Project;
 use App\Repository\ProjectRepository;
 use App\Repository\UserRepository;
-use App\Service\RequestValidator;
-use App\Service\EntityFactory;
+use App\Services\Project\ProjectService;
+use App\Services\RequestCheckerService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[Route('/api/projects')]
 final class ProjectController extends BaseApiController
 {
+    private const REQUIRED_FIELDS_FOR_CREATE = ['title','ownerId'];
+
+    public function __construct(
+        private readonly EntityManagerInterface $entityManager,
+        private readonly RequestCheckerService $requestChecker,
+        private readonly ProjectService $service,
+        private readonly UserRepository $users
+    ) {}
+
     #[Route('', methods: ['GET'])]
     public function index(ProjectRepository $repo): Response
     {
@@ -24,66 +34,58 @@ final class ProjectController extends BaseApiController
     #[Route('/{id}', methods: ['GET'])]
     public function show(int $id, ProjectRepository $repo): Response
     {
-        $entity = $repo->find($id);
-        return $entity ? $this->jsonOk($entity) : $this->jsonError('Not found', 404);
+        $p = $repo->find($id);
+        if (!$p) throw new NotFoundHttpException('Not found');
+        return $this->jsonOk($p);
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request, EntityManagerInterface $em, UserRepository $users, RequestValidator $v, EntityFactory $factory): Response
+    public function create(Request $request): JsonResponse
     {
-        $data = $this->getJson($request);
-        try {
-            $v->requireFields($data, ['title','ownerId']);
-            $ownerId = $v->requireInt($data['ownerId'] ?? null, 'ownerId');
-        } catch (\Throwable $e) {
-            return $this->jsonError($e->getMessage(), 400);
-        }
+        $data = json_decode($request->getContent(), true);
+        $this->requestChecker->check($data, self::REQUIRED_FIELDS_FOR_CREATE);
 
-        $owner = $users->find($ownerId);
-        if (!$owner) {
-            return $this->jsonError('Owner not found', 404);
-        }
+        $owner = $this->users->find((int)$data['ownerId']);
+        if (!$owner) throw new NotFoundHttpException('Owner not found');
 
-        $title = $v->requireString($data['title'] ?? null, 'title', 1, 160);
-        $desc = $v->optionalString($data['description'] ?? null, 2000);
+        $project = $this->service->create(
+            (string)$data['title'],
+            $data['description'] ?? null,
+            $owner
+        );
 
-        $entity = $factory->createProject($title, $desc, $owner);
-$em->persist($entity);
-        $this->flush($em);
-
-        return $this->jsonOk($entity, 201);
+        $this->entityManager->flush();
+        return new JsonResponse($project, Response::HTTP_CREATED);
     }
 
     #[Route('/{id}', methods: ['PUT','PATCH'])]
-    public function update(int $id, Request $request, ProjectRepository $repo, UserRepository $users, EntityManagerInterface $em): Response
+    public function update(int $id, Request $request, ProjectRepository $repo): JsonResponse
     {
-        $entity = $repo->find($id);
-        if (!$entity) return $this->jsonError('Not found', 404);
+        $project = $repo->find($id);
+        if (!$project) throw new NotFoundHttpException('Not found');
 
-        $data = $this->getJson($request);
+        $data = json_decode($request->getContent(), true) ?? [];
 
-        if (isset($data['title'])) $entity->setTitle((string)$data['title']);
-        if (array_key_exists('description', $data)) $entity->setDescription($data['description'] !== null ? (string)$data['description'] : null);
-
+        $owner = null;
         if (isset($data['ownerId'])) {
-            $owner = $users->find((int)$data['ownerId']);
-            if (!$owner) return $this->jsonError('Owner not found', 404);
-            $entity->setOwner($owner);
+            $owner = $this->users->find((int)$data['ownerId']);
+            if (!$owner) throw new NotFoundHttpException('Owner not found');
         }
 
-        $this->flush($em);
-        return $this->jsonOk($entity);
+        $this->service->update($project, $data, $owner);
+
+        $this->entityManager->flush();
+        return new JsonResponse($project, Response::HTTP_OK);
     }
 
     #[Route('/{id}', methods: ['DELETE'])]
-    public function delete(int $id, ProjectRepository $repo, EntityManagerInterface $em): Response
+    public function delete(int $id, ProjectRepository $repo): JsonResponse
     {
-        $entity = $repo->find($id);
-        if (!$entity) return $this->jsonError('Not found', 404);
+        $project = $repo->find($id);
+        if (!$project) throw new NotFoundHttpException('Not found');
 
-        $em->remove($entity);
-        $this->flush($em);
-
-        return $this->jsonOk(['status' => 'deleted']);
+        $this->entityManager->remove($project);
+        $this->entityManager->flush();
+        return new JsonResponse(['status' => 'deleted'], Response::HTTP_OK);
     }
 }

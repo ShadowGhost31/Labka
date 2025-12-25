@@ -5,6 +5,7 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'users')]
@@ -16,13 +17,21 @@ class User
     private ?int $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
-    private ?string $email = null;
+    
+    #[Assert\NotBlank]
+
+    #[Assert\Email]
+
+    #[Assert\Length(max: 180)]
+private ?string $email = null;
 
     #[ORM\Column(length: 120)]
     private ?string $name = null;
 
     #[ORM\Column]
-    private ?\DateTimeImmutable $createdAt = null;
+    
+    #[Assert\NotNull]
+private ?\DateTimeImmutable $createdAt = null;
 
     /** @var Collection<int, UserRole> */
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: UserRole::class, orphanRemoval: true)]
