@@ -4,7 +4,6 @@ namespace App\Entity;
 
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'time_entries')]
@@ -16,31 +15,21 @@ class TimeEntry
     private ?int $id = null;
 
     #[ORM\Column]
-    
-    #[Assert\NotNull]
-
-    #[Assert\Positive]
-private int $minutes = 0;
+    private int $minutes = 0;
 
     #[ORM\Column(type: 'date_immutable')]
     private ?\DateTimeImmutable $workDate = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    
-    #[Assert\Length(max: 1000)]
-private ?string $note = null;
+    private ?string $note = null;
 
     #[ORM\ManyToOne(inversedBy: 'timeEntries')]
     #[ORM\JoinColumn(nullable: false)]
-    
-    #[Assert\NotNull]
-private ?User $user = null;
+    private ?User $user = null;
 
     #[ORM\ManyToOne(inversedBy: 'timeEntries')]
     #[ORM\JoinColumn(nullable: false)]
-    
-    #[Assert\NotNull]
-private ?Task $task = null;
+    private ?Task $task = null;
 
     public function __construct()
     {

@@ -4,7 +4,6 @@ namespace App\Entity;
 
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'comments')]
@@ -16,28 +15,18 @@ class Comment
     private ?int $id = null;
 
     #[ORM\Column(type: 'text')]
-    
-    #[Assert\NotBlank]
-
-    #[Assert\Length(max: 2000)]
-private ?string $content = null;
+    private ?string $content = null;
 
     #[ORM\Column]
-    
-    #[Assert\NotNull]
-private ?\DateTimeImmutable $createdAt = null;
+    private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'comments')]
     #[ORM\JoinColumn(nullable: false)]
-    
-    #[Assert\NotNull]
-private ?User $author = null;
+    private ?User $author = null;
 
     #[ORM\ManyToOne(inversedBy: 'comments')]
     #[ORM\JoinColumn(nullable: false)]
-    
-    #[Assert\NotNull]
-private ?Task $task = null;
+    private ?Task $task = null;
 
     public function __construct()
     {

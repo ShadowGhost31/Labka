@@ -3,7 +3,6 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'attachments')]
@@ -15,31 +14,21 @@ class Attachment
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    
-    #[Assert\NotBlank]
-
-    #[Assert\Length(max: 255)]
-private ?string $filename = null;
+    private ?string $filename = null;
 
     #[ORM\Column(length: 512)]
     private ?string $path = null;
 
     #[ORM\Column]
-    
-    #[Assert\NotNull]
-private ?\DateTimeImmutable $createdAt = null;
+    private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'attachments')]
     #[ORM\JoinColumn(nullable: false)]
-    
-    #[Assert\NotNull]
-private ?User $uploadedBy = null;
+    private ?User $uploadedBy = null;
 
     #[ORM\ManyToOne(inversedBy: 'attachments')]
     #[ORM\JoinColumn(nullable: false)]
-    
-    #[Assert\NotNull]
-private ?Task $task = null;
+    private ?Task $task = null;
 
     public function __construct()
     {

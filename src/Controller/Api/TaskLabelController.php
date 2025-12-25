@@ -2,90 +2,97 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\TaskLabel;
 use App\Repository\LabelRepository;
 use App\Repository\TaskLabelRepository;
 use App\Repository\TaskRepository;
-use App\Services\RequestCheckerService;
-use App\Services\TaskLabel\TaskLabelService;
+use App\Service\RequestValidator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[Route('/api/task-labels')]
 final class TaskLabelController extends BaseApiController
 {
-    private const REQUIRED_FIELDS_FOR_CREATE = ['taskId','labelId'];
-
-    public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-        private readonly RequestCheckerService $requestChecker,
-        private readonly TaskLabelService $service,
-        private readonly TaskRepository $tasks,
-        private readonly LabelRepository $labels
-    ) {}
-
     #[Route('', methods: ['GET'])]
-    public function index(TaskLabelRepository $repo): Response
-    {
-        return $this->jsonOk($repo->findAll());
-    }
+    public function index(Request $request, TaskLabelRepository $repo): Response
+{
+    $requestData = $request->query->all();
+    $itemsPerPage = (int) ($requestData['itemsPerPage'] ?? 10);
+    $page = (int) ($requestData['page'] ?? 1);
+
+    unset($requestData['itemsPerPage'], $requestData['page']);
+
+    return $this->jsonOk($repo->getAllByFilter($requestData, $itemsPerPage, $page));
+}
 
     #[Route('/{id}', methods: ['GET'])]
     public function show(int $id, TaskLabelRepository $repo): Response
     {
-        $tl = $repo->find($id);
-        if (!$tl) throw new NotFoundHttpException('Not found');
-        return $this->jsonOk($tl);
+        $entity = $repo->find($id);
+        return $entity ? $this->jsonOk($entity) : $this->jsonError('Not found', 404);
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request): JsonResponse
+    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, LabelRepository $labels, RequestValidator $v): Response
     {
-        $data = json_decode($request->getContent(), true);
-        $this->requestChecker->check($data, self::REQUIRED_FIELDS_FOR_CREATE);
+        $data = $this->getJson($request);
 
-        $task = $this->tasks->find((int)$data['taskId']);
-        $label = $this->labels->find((int)$data['labelId']);
-        if (!$task) throw new NotFoundHttpException('Task not found');
-        if (!$label) throw new NotFoundHttpException('Label not found');
+        try {
+            $v->requireFields($data, ['taskId','labelId']);
+            $taskId = $v->requireInt($data['taskId'] ?? null, 'taskId');
+            $labelId = $v->requireInt($data['labelId'] ?? null, 'labelId');
+        } catch (\Throwable $e) {
+            return $this->jsonError($e->getMessage(), 400);
+        }
 
-        $tl = $this->service->create($task, $label);
+        $task = $tasks->find($taskId);
+        $label = $labels->find($labelId);
+        if (!$task) return $this->jsonError('Task not found', 404);
+        if (!$label) return $this->jsonError('Label not found', 404);
 
-        $this->entityManager->flush();
-        return new JsonResponse($tl, Response::HTTP_CREATED);
+        $entity = new TaskLabel();
+        $entity->setTask($task);
+        $entity->setLabel($label);
+
+        $em->persist($entity);
+        $this->flush($em);
+
+        return $this->jsonOk($entity, 201);
     }
 
     #[Route('/{id}', methods: ['PUT','PATCH'])]
-    public function update(int $id, Request $request, TaskLabelRepository $repo): JsonResponse
+    public function update(int $id, Request $request, TaskLabelRepository $repo, TaskRepository $tasks, LabelRepository $labels, EntityManagerInterface $em): Response
     {
-        $tl = $repo->find($id);
-        if (!$tl) throw new NotFoundHttpException('Not found');
+        $entity = $repo->find($id);
+        if (!$entity) return $this->jsonError('Not found', 404);
 
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $this->getJson($request);
 
-        $task = isset($data['taskId']) ? $this->tasks->find((int)$data['taskId']) : null;
-        $label = isset($data['labelId']) ? $this->labels->find((int)$data['labelId']) : null;
+        if (isset($data['taskId'])) {
+            $task = $tasks->find((int)$data['taskId']);
+            if (!$task) return $this->jsonError('Task not found', 404);
+            $entity->setTask($task);
+        }
+        if (isset($data['labelId'])) {
+            $label = $labels->find((int)$data['labelId']);
+            if (!$label) return $this->jsonError('Label not found', 404);
+            $entity->setLabel($label);
+        }
 
-        if (isset($data['taskId']) && !$task) throw new NotFoundHttpException('Task not found');
-        if (isset($data['labelId']) && !$label) throw new NotFoundHttpException('Label not found');
-
-        $this->service->update($tl, $task, $label);
-
-        $this->entityManager->flush();
-        return new JsonResponse($tl, Response::HTTP_OK);
+        $this->flush($em);
+        return $this->jsonOk($entity);
     }
 
     #[Route('/{id}', methods: ['DELETE'])]
-    public function delete(int $id, TaskLabelRepository $repo): JsonResponse
+    public function delete(int $id, TaskLabelRepository $repo, EntityManagerInterface $em): Response
     {
-        $tl = $repo->find($id);
-        if (!$tl) throw new NotFoundHttpException('Not found');
+        $entity = $repo->find($id);
+        if (!$entity) return $this->jsonError('Not found', 404);
 
-        $this->entityManager->remove($tl);
-        $this->entityManager->flush();
-        return new JsonResponse(['status' => 'deleted'], Response::HTTP_OK);
+        $em->remove($entity);
+        $this->flush($em);
+        return $this->jsonOk(['status' => 'deleted']);
     }
 }

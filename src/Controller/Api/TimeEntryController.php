@@ -2,99 +2,114 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\TimeEntry;
 use App\Repository\TaskRepository;
 use App\Repository\TimeEntryRepository;
 use App\Repository\UserRepository;
-use App\Services\RequestCheckerService;
-use App\Services\TimeEntry\TimeEntryService;
+use App\Service\RequestValidator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[Route('/api/time-entries')]
 final class TimeEntryController extends BaseApiController
 {
-    private const REQUIRED_FIELDS_FOR_CREATE = ['minutes','workDate','taskId','userId'];
-
-    public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-        private readonly RequestCheckerService $requestChecker,
-        private readonly TimeEntryService $service,
-        private readonly TaskRepository $tasks,
-        private readonly UserRepository $users
-    ) {}
-
     #[Route('', methods: ['GET'])]
-    public function index(TimeEntryRepository $repo): Response
-    {
-        return $this->jsonOk($repo->findAll());
-    }
+    public function index(Request $request, TimeEntryRepository $repo): Response
+{
+    $requestData = $request->query->all();
+    $itemsPerPage = (int) ($requestData['itemsPerPage'] ?? 10);
+    $page = (int) ($requestData['page'] ?? 1);
+
+    unset($requestData['itemsPerPage'], $requestData['page']);
+
+    return $this->jsonOk($repo->getAllByFilter($requestData, $itemsPerPage, $page));
+}
 
     #[Route('/{id}', methods: ['GET'])]
     public function show(int $id, TimeEntryRepository $repo): Response
     {
-        $t = $repo->find($id);
-        if (!$t) throw new NotFoundHttpException('Not found');
-        return $this->jsonOk($t);
+        $entity = $repo->find($id);
+        return $entity ? $this->jsonOk($entity) : $this->jsonError('Not found', 404);
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request): JsonResponse
+    public function create(Request $request, EntityManagerInterface $em, TaskRepository $tasks, UserRepository $users, RequestValidator $v): Response
     {
-        $data = json_decode($request->getContent(), true);
-        $this->requestChecker->check($data, self::REQUIRED_FIELDS_FOR_CREATE);
-
-        $task = $this->tasks->find((int)$data['taskId']);
-        $user = $this->users->find((int)$data['userId']);
-        if (!$task) throw new NotFoundHttpException('Task not found');
-        if (!$user) throw new NotFoundHttpException('User not found');
+        $data = $this->getJson($request);
 
         try {
-            $workDate = new \DateTimeImmutable((string)$data['workDate']);
-        } catch (\Throwable) {
-            // will be formatted by listener
-            throw new \Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException(json_encode([
-                'workDate' => 'workDate must be a valid date (YYYY-MM-DD)'
-            ]));
+            $v->requireFields($data, ['minutes','workDate','taskId','userId']);
+            $taskId = $v->requireInt($data['taskId'] ?? null, 'taskId');
+            $userId = $v->requireInt($data['userId'] ?? null, 'userId');
+        } catch (\Throwable $e) {
+            return $this->jsonError($e->getMessage(), 400);
         }
 
-        $t = $this->service->create((int)$data['minutes'], $workDate, $task, $user, $data['note'] ?? null);
+        $task = $tasks->find($taskId);
+        $user = $users->find($userId);
+        if (!$task) return $this->jsonError('Task not found', 404);
+        if (!$user) return $this->jsonError('User not found', 404);
 
-        $this->entityManager->flush();
-        return new JsonResponse($t, Response::HTTP_CREATED);
+        $entity = new TimeEntry();
+        $entity->setMinutes((int)$data['minutes']);
+        $entity->setTask($task);
+        $entity->setUser($user);
+        $entity->setNote(isset($data['note']) ? (string)$data['note'] : null);
+
+        if (isset($data['workDate']) && is_string($data['workDate'])) {
+            try { $entity->setWorkDate(new \DateTimeImmutable($data['workDate'])); } catch (\Throwable) {}
+        }
+
+        $em->persist($entity);
+        $this->flush($em);
+
+        return $this->jsonOk($entity, 201);
     }
 
     #[Route('/{id}', methods: ['PUT','PATCH'])]
-    public function update(int $id, Request $request, TimeEntryRepository $repo): JsonResponse
+    public function update(int $id, Request $request, TimeEntryRepository $repo, TaskRepository $tasks, UserRepository $users, EntityManagerInterface $em): Response
     {
-        $t = $repo->find($id);
-        if (!$t) throw new NotFoundHttpException('Not found');
+        $entity = $repo->find($id);
+        if (!$entity) return $this->jsonError('Not found', 404);
 
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $this->getJson($request);
 
-        $task = isset($data['taskId']) ? $this->tasks->find((int)$data['taskId']) : null;
-        $user = isset($data['userId']) ? $this->users->find((int)$data['userId']) : null;
+        if (isset($data['minutes'])) $entity->setMinutes((int)$data['minutes']);
+        if (array_key_exists('note', $data)) $entity->setNote($data['note'] !== null ? (string)$data['note'] : null);
 
-        if (isset($data['taskId']) && !$task) throw new NotFoundHttpException('Task not found');
-        if (isset($data['userId']) && !$user) throw new NotFoundHttpException('User not found');
+        if (isset($data['taskId'])) {
+            $task = $tasks->find((int)$data['taskId']);
+            if (!$task) return $this->jsonError('Task not found', 404);
+            $entity->setTask($task);
+        }
+        if (isset($data['userId'])) {
+            $user = $users->find((int)$data['userId']);
+            if (!$user) return $this->jsonError('User not found', 404);
+            $entity->setUser($user);
+        }
 
-        $this->service->update($t, $data, $task, $user);
+        if (array_key_exists('workDate', $data)) {
+            if ($data['workDate'] === null || $data['workDate'] === '') {
+                // keep previous if null (or set to today - up to you). We'll keep previous.
+            } elseif (is_string($data['workDate'])) {
+                try { $entity->setWorkDate(new \DateTimeImmutable($data['workDate'])); } catch (\Throwable) {}
+            }
+        }
 
-        $this->entityManager->flush();
-        return new JsonResponse($t, Response::HTTP_OK);
+        $this->flush($em);
+        return $this->jsonOk($entity);
     }
 
     #[Route('/{id}', methods: ['DELETE'])]
-    public function delete(int $id, TimeEntryRepository $repo): JsonResponse
+    public function delete(int $id, TimeEntryRepository $repo, EntityManagerInterface $em): Response
     {
-        $t = $repo->find($id);
-        if (!$t) throw new NotFoundHttpException('Not found');
+        $entity = $repo->find($id);
+        if (!$entity) return $this->jsonError('Not found', 404);
 
-        $this->entityManager->remove($t);
-        $this->entityManager->flush();
-        return new JsonResponse(['status' => 'deleted'], Response::HTTP_OK);
+        $em->remove($entity);
+        $this->flush($em);
+        return $this->jsonOk(['status' => 'deleted']);
     }
 }

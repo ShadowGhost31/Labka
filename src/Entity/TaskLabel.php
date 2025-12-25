@@ -3,7 +3,6 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'task_labels', uniqueConstraints: [
@@ -18,9 +17,7 @@ class TaskLabel
 
     #[ORM\ManyToOne(inversedBy: 'taskLabels')]
     #[ORM\JoinColumn(nullable: false)]
-    
-    #[Assert\NotNull]
-private ?Task $task = null;
+    private ?Task $task = null;
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]

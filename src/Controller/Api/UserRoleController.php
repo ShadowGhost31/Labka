@@ -2,90 +2,99 @@
 
 namespace App\Controller\Api;
 
+use App\Entity\UserRole;
 use App\Repository\RoleRepository;
 use App\Repository\UserRepository;
 use App\Repository\UserRoleRepository;
-use App\Services\RequestCheckerService;
-use App\Services\UserRole\UserRoleService;
+use App\Service\RequestValidator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[Route('/api/user-roles')]
 final class UserRoleController extends BaseApiController
 {
-    private const REQUIRED_FIELDS_FOR_CREATE = ['userId','roleId'];
-
-    public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-        private readonly RequestCheckerService $requestChecker,
-        private readonly UserRoleService $service,
-        private readonly UserRepository $users,
-        private readonly RoleRepository $roles
-    ) {}
-
     #[Route('', methods: ['GET'])]
-    public function index(UserRoleRepository $repo): Response
-    {
-        return $this->jsonOk($repo->findAll());
-    }
+    public function index(Request $request, UserRoleRepository $repo): Response
+{
+    $requestData = $request->query->all();
+    $itemsPerPage = (int) ($requestData['itemsPerPage'] ?? 10);
+    $page = (int) ($requestData['page'] ?? 1);
+
+    unset($requestData['itemsPerPage'], $requestData['page']);
+
+    return $this->jsonOk($repo->getAllByFilter($requestData, $itemsPerPage, $page));
+}
 
     #[Route('/{id}', methods: ['GET'])]
     public function show(int $id, UserRoleRepository $repo): Response
     {
-        $ur = $repo->find($id);
-        if (!$ur) throw new NotFoundHttpException('Not found');
-        return $this->jsonOk($ur);
+        $entity = $repo->find($id);
+        return $entity ? $this->jsonOk($entity) : $this->jsonError('Not found', 404);
     }
 
     #[Route('', methods: ['POST'])]
-    public function create(Request $request): JsonResponse
+    public function create(Request $request, EntityManagerInterface $em, UserRepository $users, RoleRepository $roles, RequestValidator $v): Response
     {
-        $data = json_decode($request->getContent(), true);
-        $this->requestChecker->check($data, self::REQUIRED_FIELDS_FOR_CREATE);
+        $data = $this->getJson($request);
 
-        $user = $this->users->find((int)$data['userId']);
-        $role = $this->roles->find((int)$data['roleId']);
-        if (!$user) throw new NotFoundHttpException('User not found');
-        if (!$role) throw new NotFoundHttpException('Role not found');
+        try {
+            $v->requireFields($data, ['userId','roleId']);
+            $userId = $v->requireInt($data['userId'] ?? null, 'userId');
+            $roleId = $v->requireInt($data['roleId'] ?? null, 'roleId');
+        } catch (\Throwable $e) {
+            return $this->jsonError($e->getMessage(), 400);
+        }
 
-        $ur = $this->service->create($user, $role);
+        $user = $users->find($userId);
+        $role = $roles->find($roleId);
 
-        $this->entityManager->flush();
-        return new JsonResponse($ur, Response::HTTP_CREATED);
+        if (!$user) return $this->jsonError('User not found', 404);
+        if (!$role) return $this->jsonError('Role not found', 404);
+
+        $entity = new UserRole();
+        $entity->setUser($user);
+        $entity->setRole($role);
+
+        $em->persist($entity);
+        $this->flush($em);
+
+        return $this->jsonOk($entity, 201);
     }
 
     #[Route('/{id}', methods: ['PUT','PATCH'])]
-    public function update(int $id, Request $request, UserRoleRepository $repo): JsonResponse
+    public function update(int $id, Request $request, UserRoleRepository $repo, UserRepository $users, RoleRepository $roles, EntityManagerInterface $em): Response
     {
-        $ur = $repo->find($id);
-        if (!$ur) throw new NotFoundHttpException('Not found');
+        $entity = $repo->find($id);
+        if (!$entity) return $this->jsonError('Not found', 404);
 
-        $data = json_decode($request->getContent(), true) ?? [];
+        $data = $this->getJson($request);
 
-        $user = isset($data['userId']) ? $this->users->find((int)$data['userId']) : null;
-        $role = isset($data['roleId']) ? $this->roles->find((int)$data['roleId']) : null;
+        if (isset($data['userId'])) {
+            $user = $users->find((int)$data['userId']);
+            if (!$user) return $this->jsonError('User not found', 404);
+            $entity->setUser($user);
+        }
+        if (isset($data['roleId'])) {
+            $role = $roles->find((int)$data['roleId']);
+            if (!$role) return $this->jsonError('Role not found', 404);
+            $entity->setRole($role);
+        }
 
-        if (isset($data['userId']) && !$user) throw new NotFoundHttpException('User not found');
-        if (isset($data['roleId']) && !$role) throw new NotFoundHttpException('Role not found');
-
-        $this->service->update($ur, $user, $role);
-
-        $this->entityManager->flush();
-        return new JsonResponse($ur, Response::HTTP_OK);
+        $this->flush($em);
+        return $this->jsonOk($entity);
     }
 
     #[Route('/{id}', methods: ['DELETE'])]
-    public function delete(int $id, UserRoleRepository $repo): JsonResponse
+    public function delete(int $id, UserRoleRepository $repo, EntityManagerInterface $em): Response
     {
-        $ur = $repo->find($id);
-        if (!$ur) throw new NotFoundHttpException('Not found');
+        $entity = $repo->find($id);
+        if (!$entity) return $this->jsonError('Not found', 404);
 
-        $this->entityManager->remove($ur);
-        $this->entityManager->flush();
-        return new JsonResponse(['status' => 'deleted'], Response::HTTP_OK);
+        $em->remove($entity);
+        $this->flush($em);
+
+        return $this->jsonOk(['status' => 'deleted']);
     }
 }
