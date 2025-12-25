@@ -65,18 +65,12 @@ php bin/console make:controller ItemController
 📸 **Скріншот маршрутизатора (`debug:router`):**
 ![Routes](screenshots/routes.png)
 
-### Скріншоти тестування CRUD
+### Скріншот тестування CRUD
 - **Create (POST):**
-  ![CRUD create](screenshots/crud-create.png)
-
 - **Read (GET):**
-  ![CRUD read](screenshots/crud-read.png)
-
 - **Update (PUT):**
-  ![CRUD update](screenshots/crud-update.png)
-
 - **Delete (DELETE):**
-  ![CRUD delete](screenshots/crud-delete.png)
+  ![CRUD delete](screenshots/crud.png)
 
 ---
 
@@ -94,14 +88,3 @@ Xdebug встановлено та налаштовано для налагод�
 📸 **Перевірка Xdebug (`php -v`):**
 ![Xdebug](screenshots/xdebug.png)
 
----
-
-## Висновок
-У ході лабораторної роботи:
-- встановлено PHP та Symfony 6.4;
-- створено та запущено Symfony-проєкт;
-- реалізовано CRUD без використання бази даних;
-- проєкт розміщено на GitHub;
-- налаштовано Xdebug для налагодження коду.
-
-✔ **Лабораторна робота №1 виконана повністю**
