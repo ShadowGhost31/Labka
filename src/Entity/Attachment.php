@@ -3,31 +3,56 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\ApiProperty;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'attachments')]
+#[ApiResource(
+    operations: [
+        new GetCollection(normalizationContext: ['groups' => ['attachment:read']]),
+        new Post(denormalizationContext: ['groups' => ['attachment:write']], normalizationContext: ['groups' => ['attachment:read']]),
+        new Get(normalizationContext: ['groups' => ['attachment:read']]),
+        new Patch(denormalizationContext: ['groups' => ['attachment:write']], normalizationContext: ['groups' => ['attachment:read']]),
+        new Delete(),
+    ]
+)]
 class Attachment
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(["attachment:read"])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(["attachment:read", "attachment:write"])]
     private ?string $filename = null;
 
     #[ORM\Column(length: 512)]
+    #[Groups(["attachment:read", "attachment:write"])]
     private ?string $path = null;
 
     #[ORM\Column]
+    #[Groups(["attachment:read", "attachment:write"])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'attachments')]
     #[ORM\JoinColumn(nullable: false)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["attachment:read", "attachment:write"])]
     private ?User $uploadedBy = null;
 
     #[ORM\ManyToOne(inversedBy: 'attachments')]
     #[ORM\JoinColumn(nullable: false)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["attachment:read", "attachment:write"])]
     private ?Task $task = null;
 
     public function __construct()

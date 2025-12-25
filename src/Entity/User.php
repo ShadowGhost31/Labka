@@ -7,59 +7,97 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\ApiProperty;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'users')]
+#[ApiResource(
+    operations: [
+        new GetCollection(normalizationContext: ['groups' => ['user:read']]),
+        new Post(denormalizationContext: ['groups' => ['user:write']], normalizationContext: ['groups' => ['user:read']]),
+        new Get(normalizationContext: ['groups' => ['user:read']]),
+        new Patch(denormalizationContext: ['groups' => ['user:write']], normalizationContext: ['groups' => ['user:read']]),
+        new Delete(),
+    ]
+)]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(["user:read"])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
+    #[Groups(["user:read", "user:write"])]
     private ?string $email = null;
 
     #[ORM\Column(length: 120)]
+    #[Groups(["user:read", "user:write"])]
     private ?string $name = null;
 
 
     #[ORM\Column(length: 255)]
+    #[Groups(["user:read", "user:write"])]
     private string $password = '';
 
     #[ORM\Column]
+    #[Groups(["user:read", "user:write"])]
     private ?\DateTimeImmutable $createdAt = null;
 
     /** @var Collection<int, UserRole> */
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: UserRole::class, orphanRemoval: true)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["user:read", "user:write"])]
     private Collection $userRoles;
 
     /** @var Collection<int, Project> */
     #[ORM\OneToMany(mappedBy: 'owner', targetEntity: Project::class)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["user:read", "user:write"])]
     private Collection $ownedProjects;
 
     /** @var Collection<int, ProjectMember> */
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: ProjectMember::class, orphanRemoval: true)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["user:read", "user:write"])]
     private Collection $projectMemberships;
 
     /** @var Collection<int, Task> */
     #[ORM\OneToMany(mappedBy: 'creator', targetEntity: Task::class)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["user:read", "user:write"])]
     private Collection $createdTasks;
 
     /** @var Collection<int, Task> */
     #[ORM\OneToMany(mappedBy: 'assignee', targetEntity: Task::class)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["user:read", "user:write"])]
     private Collection $assignedTasks;
 
     /** @var Collection<int, Comment> */
     #[ORM\OneToMany(mappedBy: 'author', targetEntity: Comment::class)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["user:read", "user:write"])]
     private Collection $comments;
 
     /** @var Collection<int, Attachment> */
     #[ORM\OneToMany(mappedBy: 'uploadedBy', targetEntity: Attachment::class)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["user:read", "user:write"])]
     private Collection $attachments;
 
     /** @var Collection<int, TimeEntry> */
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: TimeEntry::class)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["user:read", "user:write"])]
     private Collection $timeEntries;
 
     public function __construct()

@@ -4,28 +4,52 @@ namespace App\Entity;
 
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\ApiProperty;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'comments')]
+#[ApiResource(
+    operations: [
+        new GetCollection(normalizationContext: ['groups' => ['comment:read']]),
+        new Post(denormalizationContext: ['groups' => ['comment:write']], normalizationContext: ['groups' => ['comment:read']]),
+        new Get(normalizationContext: ['groups' => ['comment:read']]),
+        new Patch(denormalizationContext: ['groups' => ['comment:write']], normalizationContext: ['groups' => ['comment:read']]),
+        new Delete(),
+    ]
+)]
 class Comment
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(["comment:read"])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'text')]
+    #[Groups(["comment:read", "comment:write"])]
     private ?string $content = null;
 
     #[ORM\Column]
+    #[Groups(["comment:read", "comment:write"])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'comments')]
     #[ORM\JoinColumn(nullable: false)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["comment:read", "comment:write"])]
     private ?User $author = null;
 
     #[ORM\ManyToOne(inversedBy: 'comments')]
     #[ORM\JoinColumn(nullable: false)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["comment:read", "comment:write"])]
     private ?Task $task = null;
 
     public function __construct()

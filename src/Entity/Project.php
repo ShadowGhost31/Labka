@@ -6,35 +6,62 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\ApiProperty;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'projects')]
+#[ApiResource(
+    operations: [
+        new GetCollection(normalizationContext: ['groups' => ['project:read']]),
+        new Post(denormalizationContext: ['groups' => ['project:write']], normalizationContext: ['groups' => ['project:read']]),
+        new Get(normalizationContext: ['groups' => ['project:read']]),
+        new Patch(denormalizationContext: ['groups' => ['project:write']], normalizationContext: ['groups' => ['project:read']]),
+        new Delete(),
+    ]
+)]
 class Project
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(["project:read"])]
     private ?int $id = null;
 
     #[ORM\Column(length: 160)]
+    #[Groups(["project:read", "project:write"])]
     private ?string $title = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(["project:read", "project:write"])]
     private ?string $description = null;
 
     #[ORM\Column]
+    #[Groups(["project:read", "project:write"])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'ownedProjects')]
     #[ORM\JoinColumn(nullable: false)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["project:read", "project:write"])]
     private ?User $owner = null;
 
     /** @var Collection<int, ProjectMember> */
     #[ORM\OneToMany(mappedBy: 'project', targetEntity: ProjectMember::class, orphanRemoval: true)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["project:read", "project:write"])]
     private Collection $members;
 
     /** @var Collection<int, Task> */
     #[ORM\OneToMany(mappedBy: 'project', targetEntity: Task::class, orphanRemoval: true)]
+    #[ApiProperty(readableLink: false, writableLink: false)]
+    #[Groups(["project:read", "project:write"])]
     private Collection $tasks;
 
     public function __construct()
